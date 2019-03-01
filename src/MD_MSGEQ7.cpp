@@ -40,11 +40,25 @@ void MD_MSGEQ7::begin(void)
 void MD_MSGEQ7::reset(void)
 {
 	// Reset the IC according to the chart in the data sheet
+	// |<0.1us>|<--------- 72us --------->|
+	//  _______                           
+	// |       |                          |  RESET
+	// |       |__________________________|
+	// 
+	//  _       __________________________                           
+	// | |     |                          |  STROBE
+	// | |_____|                          |
+	// 
+
+	digitalWrite(_strobePin, HIGH);
 	digitalWrite(_strobePin, LOW);
 	digitalWrite(_resetPin, HIGH);
-  delayMicroseconds(1); // tr = 100 nanoseconds here - likely the Arduino library will be slower than this anyway
+	
+	delayMicroseconds(1); // tr = 100 nanoseconds here - likely the Arduino library will be slower than this anyway
+	
 	digitalWrite(_resetPin, LOW);
-  delayMicroseconds(72);  // trs = 72 microseconds
+	digitalWrite(_strobePin, HIGH);
+	delayMicroseconds(72);  // trs = 72 microseconds
 }
 
 void MD_MSGEQ7::read(bool bReset)
@@ -54,11 +68,18 @@ void MD_MSGEQ7::read(bool bReset)
 
 	// read all MAX_BAND channels 
 	for (int i = 0; i < MAX_BAND; i++)
-  {
+    {
+		// |<--------- 72us --------->| x MAX_BANDS
+		//                      ______
+		// |                   |      |
+		// |                   |      |
+		// |                   |      |
+		// |<---36us--->|<18ms>|<18us>|
+		// |____________|______|      |
+		//              ^ADC measure
+
 		// trigger next value
-		digitalWrite(_strobePin, HIGH);
-    delayMicroseconds(18);  // ts = 18 microseconds
-	  digitalWrite(_strobePin, LOW);
+		digitalWrite(_strobePin, LOW);
 
 		// allow the output to settle
 		delayMicroseconds(36);  // to = 36 microseconds
@@ -66,8 +87,11 @@ void MD_MSGEQ7::read(bool bReset)
 		// read pin
 		_data[i] = analogRead(_dataPin);
     
-    delayMicroseconds(18);
-  }
+        delayMicroseconds(18);
+
+		digitalWrite(_strobePin, HIGH);
+        delayMicroseconds(18);  // ts = 18 microseconds
+    }
 }
 
 uint16_t MD_MSGEQ7::get(uint8_t band)
